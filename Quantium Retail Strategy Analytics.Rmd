@@ -1,0 +1,434 @@
+---
+title: "Retail Strategy and Analytics"
+author: "Khloe Mai"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+# DATA PREPARATION
+## 1. Load the required libraries
+```{r 0 Load Libraries, results = 'hide'}
+library(data.table)
+library(ggplot2)
+library(dplyr)
+library(skimr)
+library(readxl)
+library(readr)
+library(tidyr)
+```
+
+## 2. Set working directory
+```{r}
+setwd("C:/Users/LENOVO/Documents/KhanhMai/1. Personal/Projects/Forage/04 Quantium - Data Analytics")
+```
+
+## 3. Import data
+```{r}
+customerD <- read_csv("QVI_purchase_behaviour.csv") 
+transactionD <- read_excel("QVI_transaction_data.xlsx")
+```
+
+# DATA EXPLORATION
+## 1. Examining transaction data
+```{r}
+head(transactionD)
+str(transactionD) 
+```
+
+### Convert DATE column to a date format
+```{r}
+transactionD$DATE <- as.Date(as.numeric(transactionD$DATE), origin = "1899-12-30")
+```
+
+### Examine PROD_NAME
+```{r}
+summary(transactionD$PROD_NAME)
+```
+
+Now check if there are all chips as we are only interested in chips-related products
+Summarise individual words in PROD_NAME
+```{r}
+productWords <- data.table(
+  words = unlist(strsplit(unique(transactionD$PROD_NAME), " ")))
+```
+
+The only interest is in words telling if the product is chips or not
+Let's remove digits, special characters from these individual words
+```{r}
+productWords_clean<- productWords[!grepl("[^A-Za-z]",words)]
+```
+
+And sort these distinct words by frequency from highest to lowest
+```{r}
+wordfreq <- productWords_clean[, .N, by = words][order(-N)]
+```
+
+There are salsa products in the dataset but chip products are the sole interest so let's remove salsa products, to avoid unnecessary data loss
+```{r}
+transactionD_2 <- transactionD[!grepl("salsa",transactionD$PROD_NAME, ignore.case = TRUE),]
+```
+
+### Summarise the data to check for nulls and possible outliers
+Let's check for nulls
+```{r}
+colSums(is.na(transactionD_2)) 
+```
+There are no null values in the column
+
+
+```{r}
+#### Summarise numeric columns for outliers
+summary(transactionD_2[, sapply(transactionD_2, is.numeric)]) 
+```
+Product quantity column seems to have an outlier which is the max value, need further investigation
+
+Filter the dataset to find the outlier
+```{r}
+transactionD_filter <- transactionD_2 %>% filter(PROD_QTY==200) 
+```
+There are two transactions of 200 chips packets bought by the same customer, which needs further investigation on the customer to see if they made any other transaction
+```{r}
+transactionD_filter1 <- transactionD_2 %>% filter(LYLTY_CARD_NBR==226000)
+```
+This customer only had two purchases throughout the year, indicating non-retail customer. This might just a customer buying bulk or for commercial purposes, which should not be included in this retail customer analysis to avoid distortion.
+This loyalty card number will be removed from further analysis.
+
+```{r}
+#### Filter out the outliers
+transactionD_3 <- transactionD_2%>%filter(!LYLTY_CARD_NBR == 226000)
+```
+
+### Re-examine transaction data
+```{r}
+summary(transactionD_3)
+```
+Date column has only 364 unique values, meaning there is a missing date that need to be found
+
+
+Create a sequence of dates from 1 Jul 2018 to 30 Jun 2019
+```{r}
+#### Create a sequence of dates and join this the count of transactions by date to find missing date
+yeardates <- data.table(DATE = seq(
+  from = as.Date("2018-07-01"),
+  to = as.Date("2019-06-30"),
+  by ="day"))
+```
+
+
+```{r}
+#### Join the two DATE columns to see the missing one
+missing_date <- anti_join(yeardates,transactionD_3,by = "DATE" ) 
+```
+The missing date is 25 Dec 2018, Christmas day
+
+### Plot transactions over time
+Include missing date with 0 transaction count 
+```{r}
+transaction_bydate <- transactionD_3%>%summarise(N=n(),.by=DATE)
+transaction_bydate <- full_join(yeardates,transaction_bydate,by = "DATE")
+transaction_bydate[is.na(N), N := 0]
+```
+
+Create a plot showing the number of transactions over time
+```{r}
+ggplot(transaction_bydate, aes(x = DATE, y = N)) +
+  geom_line() +
+  labs(x = "Day", y = "Number of transactions", title = "Transactions over time") +
+  scale_x_date(breaks = "1 month") +
+  theme_bw()+ 
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 90, vjust = 0.5))
+```
+There is an increase in purchases in December and a break in late December
+
+### Filter to December and look at individual days
+```{r}
+transaction_Dec <- transaction_bydate %>% filter(DATE >= as.Date("2018-12-01") & DATE <= as.Date("2018-12-31"))
+```
+
+Let's look at the plot showing the number of transactions over December 2018
+```{r}
+ggplot(transaction_Dec, aes(x = DATE, y = N)) +
+  geom_line() +
+  labs(x = "Day", y = "Number of transactions", title = "Transactions in December 2018") +
+  scale_x_date(breaks = "3 days", date_labels = "%d-%m") +
+  theme_bw()+ 
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 90, vjust = 0.5))+
+  geom_vline(xintercept = as.Date("2018-12-25"), linetype = "dashed", color = "red")
+```
+The increase in sales occurs in the lead-up to Christmas and that there are zero sales on Christmas day itself. This is due to shops being closed on Christmas day.
+Now the data no longer has outliers, move on to creating other features such as brand of chips or pack size from PROD_NAME.
+
+### Pack size
+
+```{r}
+#### Add a pack size column from PROD_NAME by taking the digits
+transactionD_3<-transactionD_3%>% mutate(PACK_SIZE = parse_number(PROD_NAME))
+```
+
+
+```{r}
+#### Check the column if it looks sensible
+transaction_bysize<-transactionD_3%>%count(PACK_SIZE, sort = TRUE)
+```
+The largest size is 380g and the smallest is 70g, seems sensible
+
+ 
+
+```{r}
+#### Plot a histogram as PACK_SIZE is a categorical variable although it is numeric
+ggplot(transactionD_3,aes(factor(PACK_SIZE)))+
+  geom_bar()+
+  labs(x = "Pack size", y = "Number of transactions", title = "Transactions by Pack sizes")+
+  theme_bw()+
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 90, vjust = 0.5))+
+  scale_y_continuous(breaks = seq(0, max(table(transactionD_3$PACK_SIZE)) + 15000, by = 15000)) 
+```
+
+### Brands 
+
+```{r}
+#### Add a brand name column from PROD_NAME by extracting the first word
+transactionD_3<-transactionD_3%>% mutate(BRAND=sub(" .*", "", transactionD_3$PROD_NAME))
+```
+
+
+```{r}
+#### Check brand names
+unique(transactionD_3$BRAND)
+```
+Some of the brand names look like they are of the same brands. Let's combine these together
+
+```{r}
+#### Clean brand names by combing same brands
+transactionD_3 <- transactionD_3 %>%
+  mutate(BRAND = case_when(
+      BRAND == "Red" ~ "RRD",
+      BRAND == "Dorito" ~ "Doritos",
+      BRAND == "Smith" ~ "Smiths",
+      BRAND == "Infzns" ~ "Infuzions",
+      BRAND == "Snbts" ~ "Sunbites",
+      BRAND == "WW" ~ "Woolworths",
+      TRUE ~ BRAND))
+unique(transactionD_3$BRAND)
+```
+
+
+```{r}
+#### Check the brands again with its distribution
+transaction_bybrand<-transactionD_3 %>%
+  count(BRAND, sort = TRUE) 
+```
+This looks reasonable 
+
+## 2. Examining customer data
+```{r}
+head(customerD)
+summary(customerD)
+```
+Take a look at the distributions
+```{r}
+table(customerD$LIFESTAGE)
+table(customerD$PREMIUM_CUSTOMER)
+```
+Both variables are fine, no missing values or outliers
+
+## 3. Merging transaction and customer tables
+```{r}
+data <- left_join(transactionD_3,customerD,"LYLTY_CARD_NBR")
+```
+When join two tables, there might be missing customer details
+
+```{r}
+colSums(is.na(data))
+```
+There are no nulls, so all customers in transaction data has been included in the customer data.
+
+# DATA ANALYSIS
+Data analysis on customer segments
+
+## 1. Total sales by PREMIUM_CUSTOMER and LIFESTAGE
+### Summarise sales by PREMIUM_CUSTOMER and LIFESTAGE
+```{r}
+sales_bysegments <- data %>%
+  summarise(sales = sum(TOT_SALES),.by = c(PREMIUM_CUSTOMER, LIFESTAGE)) %>%
+  arrange(desc(sales))
+```
+
+### Create a plot indicating the sales by PREMIUM_CUSTOMER and LIFESTAGE
+```{r}
+ggplot(sales_bysegments,
+       aes(x = LIFESTAGE, y = sales, fill = PREMIUM_CUSTOMER)) +
+  geom_col(position = "dodge") +
+  labs(title="Total Chip Sales by Customer Segments",
+    x="Lifestage",
+    y="Total Sales",
+    fill="Customer Segmentation") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Sales comes largely from Budget - older families, Mainstream - young singles/couples, and Mainstream - retirees.,
+Let's see if the higher sales are due to there being more customers who buy chips.
+
+## 2. Number of customer by PREMIUM_CUSTOMER and LIFESTAGE
+### Summarise number of customers by PREMIUM_CUSTOMER and LIFESTAGE
+```{r}
+count_customer <- data %>%
+  summarise(count = n_distinct(LYLTY_CARD_NBR),.by = c(PREMIUM_CUSTOMER, LIFESTAGE)) %>%
+  arrange(desc(count))
+```
+
+### Create a plot indicating the number of customer by PREMIUM_CUSTOMER and LIFESTAGE
+```{r}
+ggplot(count_customer,
+       aes(x = LIFESTAGE, y = count, fill = PREMIUM_CUSTOMER)) +
+  geom_col(position = "dodge") +
+  labs(title="Number of Customers by Customer Segments",
+       x="Lifestage",
+       y="Number of Customers",
+       fill="Customer Segmentation") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+The highest number of customers who buy chips are Mainstream - young singles/couples and Mainstream - retirees. This contributes to more sales in these segments while this number is not the major driver for Budget - older families segment.
+
+Let's have a deeper look at this as higher sales can derive from other elements like more units of chips being purchased per customers
+
+## 3. Average number of chip units per customer
+### Summarise average chip units purchased per customer
+```{r}
+avg_percustomer <- data %>%
+  summarise(avg_unit = sum(PROD_QTY)/n_distinct(LYLTY_CARD_NBR),.by = c(PREMIUM_CUSTOMER, LIFESTAGE)) %>%
+  arrange(desc(avg_unit))
+```
+
+### Create a plot indicating the average number of chip units per customer by PREMIUM_CUSTOMER and LIFESTAGE
+```{r}
+ggplot(avg_percustomer,
+       aes(x = LIFESTAGE, y = avg_unit, fill = PREMIUM_CUSTOMER)) +
+  geom_col(position = "dodge") +
+  labs(title="Average Units of Chips per Customer by Customer Segments",
+       x="Lifestage",
+       y="Average Units per Customer",
+       fill="Customer Segmentation") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Older families and young families buy more chips per individual in general 
+Let's also investigate the average price per unit chips bought for each customer segment as this is also a driver of total sales.
+
+## 4. Average price per unit by PREMIUM_CUSTOMER and LIFESTAGE
+### Summarise unit price by PREMIUM_CUSTOMER and LIFESTAGE
+```{r}
+avgprice_bysegments <- data %>%
+  summarise(avg_price = sum(TOT_SALES)/sum(PROD_QTY),.by = c(PREMIUM_CUSTOMER, LIFESTAGE)) %>%
+  arrange(desc(avg_price))
+```
+
+### Create a plot indicating the average price per chip unit by PREMIUM_CUSTOMER and LIFESTAGE
+```{r}
+ggplot(avgprice_bysegments,
+       aes(x = LIFESTAGE, y = avg_price, fill = PREMIUM_CUSTOMER)) +
+  geom_col(position = "dodge") +
+  labs(title="Average Price per Unit of Chips by Customer Segments",
+       x="Lifestage",
+       y="Average Price per Unit",
+       fill="Customer Segmentation") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Mainstream - midage and young singles and couples are more willing to pay more per packet of chips compared to their budget and premium counterparts. This may be due to premium consumers are more likely to purchase healthy snacks, and when they do purchase chips, it's primarily for amusement rather than personal consumption.
+This is also supported by there being fewer premium midage and young singles and couples buying chips compared to their mainstream counterparts.
+
+As the difference in average price per unit isn't large, we can check if this difference is statistically significant.
+
+## 5. Perform an independent t-test between mainstream vs premium and budget mid-age and young singles/couples
+### Prepare the data for the t-test
+```{r}
+t_test_data <- data %>%
+  filter(LIFESTAGE %in% c("MIDAGE SINGLES/COUPLES", "YOUNG SINGLES/COUPLES")) %>%
+  mutate(PRICE_PER_UNIT = TOT_SALES/PROD_QTY)
+```
+
+### Perfom t-test between mainstream and premium/budget segments
+
+```{r}
+#### t-test between mainstream vs premium
+t.test(PRICE_PER_UNIT ~ PREMIUM_CUSTOMER,
+  data = filter(t_test_data, PREMIUM_CUSTOMER %in% c("Mainstream", "Premium")))
+```
+
+```{r}
+#### t-test between mainstream vs budget
+t.test(PRICE_PER_UNIT ~ PREMIUM_CUSTOMER,
+  data = filter(t_test_data, PREMIUM_CUSTOMER %in% c("Mainstream", "Budget")))
+```
+Independent t-test results have the p-value < 0.05 at 95% confidence interval for both tests. This indicates the differences are statistically significant. In other words, the unit price for mainstream young and mid-age singles/couples are statistically significantly higher than that for budget or premium young and mid-age singles/couples. 
+It suggests that increased willingness to pay among mainstream young and mid-age customers contributes to higher overall sales.
+
+## 6. Further investigation on specific customer segments 
+Some interesting insights have been found from the analysis above. Now let's dive deeper into the target customer segments that contribute the most to chip sales to retain them or further increase sales.
+Let's look at Mainstream - young singles/couples.
+
+### Add a column to identify target customers and the rest
+```{r}
+data <- data %>%
+  mutate(TARGET_SEGMENT = 
+           if_else(PREMIUM_CUSTOMER == "Mainstream" &
+                  LIFESTAGE == "YOUNG SINGLES/COUPLES",
+                  "Target","Other"))
+```
+As the price per chip units of these groups are generally higher than the others, they might tend to buy larger packs of chips. 
+In this part, affinity analysis is used to compare purchase behaviours and preferences between target segments and the rest of customer base.
+
+### Pack size affinity analysis
+This would examine whether the target segment - Mainstream young singles/couples are more or less likely to buy certain pack sizes compared to the other segments.
+Let's see the frequency of each pack size purchased and how likely a given size is purchased between each segment.
+```{r}
+pack_affinity <- data %>%
+  count(TARGET_SEGMENT, PACK_SIZE) %>%
+  group_by(TARGET_SEGMENT) %>%
+  mutate(prop = n/sum(n)) 
+```
+
+```{r}
+#### Now compare pack size selection association between target and non-target customers
+pack_compare <- pack_affinity %>% 
+  select(-n)%>%
+  pivot_wider(names_from = TARGET_SEGMENT, values_from = prop)%>%
+  mutate(lift = Target/Other)%>%
+  arrange(desc(lift))
+```
+Sizes that have lift affinity values more than 1 are mostly larger ones, indicating target customers are significantly more likely to buy bigger packs compared to other customers
+
+The target customers might also focus on particular favourite brands of chips. Let's dive into this.
+
+### Brands affinity analysis
+This would identify if the segment of interest have stronger preference for brands than the rest. 
+```{r}
+brand_affinity <- data%>% 
+  count(TARGET_SEGMENT,BRAND)%>%
+  group_by(TARGET_SEGMENT)%>%
+  mutate(prop = n/sum(n))
+```
+
+```{r}
+#### Now compare the choice of brand between target and non-target customers
+brand_compare <- brand_affinity %>% 
+  select(-n)%>%
+  pivot_wider(names_from = TARGET_SEGMENT, values_from = prop)%>%
+  mutate(lift = Target/Other)%>%
+  arrange(desc(lift))
+```
+Lift affinity values for brands over 1 show a brand-driven purchasing behaviour within target segment, who seems to be more attracted to well-known, premium or flavoured brands such as Tyrrells, Twisties, Doritos,... than the other customers.
+
+### Insights
+This mainstream young customers have a stronger preference for taste and brands over price and tends to purchase larger packs of chips, suggesting brand-focused promotions on visibility for these labels or on bundled deals, family or party packs focused for this segment.
+
+
+  
