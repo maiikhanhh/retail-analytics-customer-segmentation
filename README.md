@@ -1,34 +1,26 @@
 # Quantium Retail Analytics Virtual Experience Program
+- **Tools**: R, dplyr, ggplot2, tidyr, data.table, readr / readxl
+- **Techniques**: Data cleaning, Feature engineering, Exploratory data analysis (EDA), Customer segmentation, Hypothesis testing, Affinity analysis
+
+## Key Insights
+<img width="500" height="362" alt="No  of transactions overtime" src="https://github.com/user-attachments/assets/4c5ab0dd-95c9-4afc-9bf3-fbba56a0439b" />
+
+### **1. Clear seasonal sales trend observed**
+- Increased demand as transaction volume rises significantly leading up to Christmas
+- No transactions on Christmas Day due to store closures
+- **Business implication**: Stock, staffing planning, and promotional activities should be focused on before the holiday seasons
+
+### **2. Mainstream young singles/couples were the highest-value segment in terms of revenue contribution**
+- Statistically significantly higher willingness to pay per unit than budget and premium counterparts
+- Stronger preference for branded/premium products
+- Higher likelihood of purchasing larger pack sizes
+- High in both customer count and sales contribution, making them a volume and value driver
+- **Business implication**: Targeted marketing campaigns and promotions, premium brand shelf visibility, and bundle/party-pack/family-size displays specialised on this segment offer potential revenue uplift
 
 ## Overview
-This repository contains my work for the Quantium Retail Strategy and Analytics Virtual Experience Program on Forage, an online platform offering self-paced virtual job stimulations designed by global top companies.
-The project focuses on data preparation, exploratory data analysis (EDA), customer segmentation and purchasing behaviour analysis using real-world retail transaction data.
-The purpose was to uncover insights into customer behaviour and support data-driven commercial decisions.
-
-## Key Work
-- Clean transaction and customer datasets
-- Identify and handle outliers and missing values
-- Explore key features like brand and pack size
-- Examine customer patterns across segments
-- Perform statistical testing to validate insights
-- Use affinity analysis on product preferences
-
-## Tools and Technologies
-### Programming and Core Packages
-- R
-- R Markdown
-- dplyr
-- ggplot2
-- tidyr
-- data.table
-- readr / readxl
-### Analytical Techniques
-- Data cleaning
-- Feature engineering
-- Exploratory data analysis (EDA)
-- Customer segmentation
-- Hypothesis testing
-- Affinity analysis
+- This repository contains my work for the Quantium Retail Strategy and Analytics Virtual Experience Program on Forage.
+The project replicates a real-world analytics workflow, including two datasets: transaction records and customer purchase behaviour, to uncover commercial insights, support evidence-based decisions, and deliver recommendations to a Category Manager.
+- **Business question**: Which customer segments drive chip sales, and how can their purchasing behaviour inform commercial strategy?
 
 ## Project Workflow
 ### 1. Data Preparation
@@ -42,6 +34,7 @@ The purpose was to uncover insights into customer behaviour and support data-dri
 - Analysed transaction trends over time
 - Investigated missing transaction dates
 - Examined sales distribution by: Customer lifestage and segments (Budget/Mainstream/Premium), Pack size, Brand
+- Merged transaction and customer datasets
 
 ### 3. Customer Segmentation Analysis
 Performed segmentation to identify behavioural differences across groups
@@ -49,47 +42,36 @@ Performed segmentation to identify behavioural differences across groups
 - Number of customers per segment
 - Average units purchased per customer by segment
 - Average price per unit by segment
-Outcome: Identified high-value customer groups driving sales
+- Outcome: Identified high-value customer groups driving sales
 
 ### 4. Statistical Testing
-- Conducted independent t-tests
-- Evaluated whether price differences between groups were statistically significant
+- Conducted independent t-tests comparing unit price between Mainstream vs Premium and Mainstream vs Budget young and mid-age singles/couples
+- Evaluated whether price differences between groups were statistically significant, indicating that Mainstream customers pay a higher unit price
+- The result suggests that greater willingness to pay, not just higher volume, drives their revenue contribution
 
 ### 5. Affinity Analysis
-- Compared the purchasing behaviour between the target and non-target customer base
-- Identified the preference patterns:
-  Preferred pack sizes
-  Preferred brands
+- Compared the purchasing behaviour between the target (Mainstream young singles/couples) and the non-target customer base
+- Identified the target segment's preference patterns:
+  - More likely to buy bigger packs
+  - Stronger brand-driven purchasing behaviour
 
-## Key Insights
-1. Clear seasonal sales trend observed:
-- Increased demand leading up to Christmas
-- No transactions on Christmas Day due to store closures
-
-2. Mainstream young singles/couples were the highest value segment in terms of revenue contribution:
-- Higher willingness to pay per unit
-- Strong preference for branded/premium products
-- Higher likelihood of purchasing larger pack sizes
-
-3. Business implication:
-- Adjust staffing and stock planning
-- Increase inventory and run promotions before the holiday season
-- Focus marketing campaigns, promotions specialised for this segment to maximise revenue
-- Prioritise preferred-brand shelf visibility
-- Promote and display bundle or family/party-size larger packs
-
-## Business Impact
+## Recommendations
 This analysis replicates real-world retail analytics workflows used in commercial teams to:
-- Optimise inventory planning by understanding seasonal sales patterns and demand fluctuations
-- Improve customer targeting strategies
-- Develop targeted promotions aligned with customer preferences
-- Support product positioning and pricing strategy
-- Improve product assortment and shelf placement decisions
-- Enable strategic decision-making with evidence-based recommendations
+- **Inventory:** Optimise planning and increase stock by understanding seasonal sales patterns and demand fluctuations
+- **Staffing:** Align staffing plans and allocation with the holiday demand spike 
+- **Promotions:** Develop targeted promotions aligned with customer preferences, like designing bundle deals and party-pack promotions targeted for mainstream young singles/couples; volume-based deals for older families
+- **Shelf placement:** Prioritise  increasing visibility for preferred brands in high-frequency areas by the target demographic
 
 ## Limitations
 - The data only covers a one-year period, which can not determine long-term trends, and patterns can differ across years
-- Lack of demographic customer information for more detailed targeted recommendations and financial (e.g. cost) data for profitability insights, as high revenue is not always profitable 
+- Lack of demographic customer information available for deeper customer profiling
+- Lack of cost data for profitability insights, as high revenue does not necessarily mean high profitability
 
+## Repository contents
+- Quantium Retail Strategy Analytics.Rmd | Full R Markdown analysis script
+- Quantium Retail Strategy Analytics Report.pdf | Written report with findings and recommendations
+- Quantium Retail Strategy Analytics - Slide.pdf | Slide deck summary for stakeholder presentation
+- QVI_transaction_data.xlsx | Transaction dataset
+- QVI_purchase_behaviour.csv | Customer purchase behaviour dataset
 
 
